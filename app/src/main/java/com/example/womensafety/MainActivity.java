@@ -1,5 +1,6 @@
 package com.example.womensafety;
 
+import android.telephony.SmsManager;
 import android.Manifest;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -24,6 +25,8 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+
+
 
 public class MainActivity extends AppCompatActivity {
 
@@ -74,6 +77,12 @@ public class MainActivity extends AppCompatActivity {
 
     private void addEmergencyContact() {
         String contact = contactInput.getText().toString().trim();
+
+
+        if (!emergencyContacts.contains("112")) {
+            emergencyContacts.add("112");
+        }
+
         if (!contact.isEmpty() && emergencyContacts.size() < 5) {
             emergencyContacts.add(contact);
             saveContacts();
@@ -83,6 +92,7 @@ public class MainActivity extends AppCompatActivity {
             Toast.makeText(this, "Max 5 contacts allowed or empty input!", Toast.LENGTH_SHORT).show();
         }
     }
+
 
     private void saveContacts() {
         SharedPreferences.Editor editor = sharedPreferences.edit();
@@ -106,10 +116,10 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onSuccess(Location location) {
                 if (location != null) {
-                    String locationMessage = "Emergency! My location: " +
-                            "https://maps.google.com/?q=" + location.getLatitude() + "," + location.getLongitude();
+                    String locationMessage = "🚨 EMERGENCY! 🚨\nI'm in danger!\n" +
+                            "📍 My location: https://maps.google.com/?q=" + location.getLatitude() + "," + location.getLongitude();
+
                     sendSMSToEmergencyContacts(locationMessage);
-                    Toast.makeText(MainActivity.this, "SOS Sent!", Toast.LENGTH_LONG).show();
                 } else {
                     Toast.makeText(MainActivity.this, "Unable to fetch location!", Toast.LENGTH_SHORT).show();
                 }
@@ -117,35 +127,39 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
+
     private void sendSMSToEmergencyContacts(String message) {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.SEND_SMS)
-                != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this,
-                    new String[]{Manifest.permission.SEND_SMS}, SMS_PERMISSION_REQUEST);
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.SEND_SMS}, SMS_PERMISSION_REQUEST);
         } else {
+            SmsManager smsManager = SmsManager.getDefault();
             for (String contact : emergencyContacts) {
-                Intent smsIntent = new Intent(Intent.ACTION_VIEW, Uri.parse("sms:" + contact));
-                smsIntent.putExtra("sms_body", message);
-                startActivity(smsIntent);
+                try {
+                    smsManager.sendTextMessage(contact, null, message, null, null);
+                    Toast.makeText(this, "🚨 SOS Alert Sent to " + contact, Toast.LENGTH_SHORT).show();
+                } catch (Exception e) {
+                    Toast.makeText(this, "❌ Failed to send SMS to " + contact, Toast.LENGTH_SHORT).show();
+                    e.printStackTrace();
+                }
             }
         }
     }
 
+
+
     @Override
+
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode == LOCATION_PERMISSION_REQUEST) {
+
+        if (requestCode == SMS_PERMISSION_REQUEST) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                fetchLocationAndSendAlert();
-            } else {
-                Toast.makeText(this, "Location permission is required for SOS!", Toast.LENGTH_SHORT).show();
-            }
-        } else if (requestCode == SMS_PERMISSION_REQUEST) {
-            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                fetchLocationAndSendAlert();
+                fetchLocationAndSendAlert(); // Retry sending SOS after getting permission
             } else {
                 Toast.makeText(this, "SMS permission is required to send alerts!", Toast.LENGTH_SHORT).show();
             }
         }
     }
 }
+
+
